@@ -325,13 +325,18 @@ contract MEMEKONG is
         _approve(address(this), address(uniswapV2Router), tokenAmount);
 
         // Perform the token swap
-        uniswapV2Router.swapExactTokensForETHSupportingFeeOnTransferTokens(
-            tokenAmount,
-            0,
-            path,
-            address(this),
-            block.timestamp
-        );
+        try
+            uniswapV2Router.swapExactTokensForETHSupportingFeeOnTransferTokens(
+                tokenAmount,
+                0,
+                path,
+                address(this),
+                block.timestamp
+            )
+        {} catch {
+            // Handle error here
+            emit SwapFailed(tokenAmount);
+        }
     }
 
     //mint memekong initial tokens (only ever called in constructor)
@@ -354,6 +359,10 @@ contract MEMEKONG is
             "Maximum staking limit reached"
         );
         require(mkongBalance() >= amt, "Error: insufficient balance"); //ensure user has enough funds
+        require(
+            stakingRewardsPool > 0,
+            "Error: the rewards pool is empty, further staking is not allowed"
+        ); //ensure there are rewards to be claimed
 
         //claim any accrued interest
         _claimInterest();
@@ -389,7 +398,15 @@ contract MEMEKONG is
             stakerStorage.getStaker(msg.sender).stakedBalance >= _amount,
             "unstake amount is bigger than you staked"
         );
-        _claimInterest();
+
+        // Calculate staking rewards
+        uint256 stakingRewards = calcStakingRewards(msg.sender);
+
+        // Only claim interest if staking rewards are less than or equal to the staking rewards pool
+        if (stakingRewards <= stakingRewardsPool) {
+            _claimInterest();
+        }
+
         uint256 outAmount = _amount;
         uint fee = 0;
         uint emerAmt = 0;
@@ -503,7 +520,7 @@ contract MEMEKONG is
             currentStaker.totalStakingInterest += interest;
 
             // uint256 tax = interest.mul(adminPercentage).div(100);
-            _transferMkong(owner(), msg.sender, interest);
+            _transferMkong(address(this), msg.sender, interest);
             stakingRewardsPool = stakingRewardsPool.sub(interest);
         }
         //save updated staker details
@@ -659,6 +676,8 @@ contract MEMEKONG is
     //adjusts max % of liquidity tokens that can be burnt from pool
     function uniPoolBurnAdjust(uint _v) external onlyOwner {
         require(!lockContract, "cannot change pool burn rate");
+        require(_v <= 10, "cannot set pool burn rate above 10%");
+        require(_v >= 0, "cannot set pool burn rate below 0%");
         poolBurnAdjust = _v;
     }
 

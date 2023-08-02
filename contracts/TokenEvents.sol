@@ -14,4 +14,7 @@ contract TokenEvents {
 
     //when a user burns tokens
     event TokenBurn(address indexed user, uint value);
+
+    //when swapTokensForEth fails
+    event SwapFailed(uint256 amount);
 }
