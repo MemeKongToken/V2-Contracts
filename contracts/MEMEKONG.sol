@@ -706,14 +706,17 @@ contract MEMEKONG is
     }
 
     function setBuyAdminCommission(uint _per) external onlyOwner {
+        require(_per <= 25, "cannot set buy tax above 25%");
         buyAdminPercentage = _per;
     }
 
     function setSellAdminCommission(uint _per) external onlyOwner {
+        require(_per <= 25, "cannot set sell tax above 25%");
         sellAdminPercentage = _per;
     }
 
     function setSellAdminPercentageMax(uint _per) external onlyOwner {
+        require(_per <= 25, "cannot set dynamic sell tax above 25%");
         sellAdminPercentageMax = _per;
     }
 
@@ -730,6 +733,10 @@ contract MEMEKONG is
     }
 
     function setMaxTransactionAmount(uint _amt) external onlyOwner {
+        require(
+            _amt >= 10000000000000,
+            "cannot set max transaction below 10k MKONG"
+        );
         maxTaxAmount = _amt;
     }
 
@@ -738,12 +745,24 @@ contract MEMEKONG is
         stakingRewardsPool += _amt;
     }
 
-    // Function to allow admin to claim *other* ERC20 tokens sent to this contract (by mistake)
+    // Function to allow admin to claim ERC20 tokens sent to this contract (by mistake)
     function rescueAnyERC20Tokens(
         address _tokenAddr,
         address _to,
         uint128 _amount
     ) external onlyOwner {
+        // If the token to be rescued is the native token of this contract
+        if (_tokenAddr == address(this)) {
+            uint256 balanceBeforeTransfer = IERC20Upgradeable(_tokenAddr)
+                .balanceOf(address(this));
+            uint256 totalReserved = totalStaked + stakingRewardsPool;
+
+            require(
+                balanceBeforeTransfer - _amount >= totalReserved,
+                "Cannot withdraw more than available balance after accounting for staked and reward pool tokens"
+            );
+        }
+
         SafeERC20Upgradeable.safeTransfer(
             IERC20Upgradeable(_tokenAddr),
             _to,
