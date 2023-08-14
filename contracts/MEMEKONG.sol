@@ -205,7 +205,6 @@ contract MEMEKONG is
         require(!bots[account], "TOKEN: Your account is blacklisted!");
         _totalSupply = _totalSupply.sub(amount);
         super._burn(account, amount);
-        emit Transfer(account, address(0), amount);
     }
 
     function _approve(
@@ -315,7 +314,6 @@ contract MEMEKONG is
                 super._transfer(sender, recipient, amount);
             }
         }
-        emit Transfer(sender, recipient, amount);
     }
 
     function swapTokensForEth(uint256 tokenAmount) internal synchronized {
@@ -676,7 +674,7 @@ contract MEMEKONG is
     //adjusts max % of liquidity tokens that can be burnt from pool
     function uniPoolBurnAdjust(uint _v) external onlyOwner {
         require(!lockContract, "cannot change pool burn rate");
-        require(_v <= 10, "cannot set pool burn rate above 10%");
+        require(_v <= 5, "cannot set pool burn rate above 5%");
         require(_v >= 0, "cannot set pool burn rate below 0%");
         poolBurnAdjust = _v;
     }
@@ -686,6 +684,7 @@ contract MEMEKONG is
     }
 
     function blockBots(address bot) external onlyOwner {
+        require(bot != uniPool, "cannot block pool address");
         bots[bot] = true;
     }
 
@@ -729,6 +728,7 @@ contract MEMEKONG is
     }
 
     function setBurnPercentage(uint _per) external onlyOwner {
+        require(_per <= 25, "cannot set burn percentage above 25%");
         burnPercentage = _per;
     }
 
