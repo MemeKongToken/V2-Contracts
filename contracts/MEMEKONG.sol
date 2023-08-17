@@ -425,6 +425,9 @@ contract MEMEKONG is
             // send token to msg.sender.
             _transferMkong(address(this), msg.sender, emerAmt);
             _burnMkong(msg.sender, fee);
+            //save updated staker details
+            stakerStorage.setStaker(msg.sender, currentStaker);
+            totalStaked = totalStaked.sub(_amount);
             return;
         }
 
