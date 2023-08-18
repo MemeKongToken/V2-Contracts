@@ -39,7 +39,6 @@ contract MEMEKONG is
     address public uniPool;
     address public admin;
 
-    uint256 internal _totalSupply;
     uint256 public totalStaked;
     uint256 public burnAdjust;
     uint256 public poolBurnAdjust;
@@ -97,7 +96,7 @@ contract MEMEKONG is
         MINUTESECONDS = 60;
         DAYSECONDS = 86400;
         maximumStakingAmount = 2e6 * 10 ** decimals();
-        maxTaxAmount = 3e6 * 10 ** decimals();
+        maxTaxAmount = 2e6 * 10 ** decimals();
         apyCount = 1251;
         buyAdminPercentage = 0;
         sellAdminPercentage = 18;
@@ -120,19 +119,9 @@ contract MEMEKONG is
         uniswapV2Router = _uniswapV2Router;
 
         mintInitialTokens(initialTokens, msg.sender);
-        _totalSupply = initialTokens;
         admin = _adminAccount;
 
         _createUniswapPair(address(this), _router);
-    }
-
-    function totalSupply()
-        public
-        view
-        override(IERC20Upgradeable, ERC20Upgradeable)
-        returns (uint256)
-    {
-        return _totalSupply;
     }
 
     function decimals() public view override returns (uint8) {
@@ -203,7 +192,6 @@ contract MEMEKONG is
     function _burnMkong(address account, uint256 amount) internal {
         require(!lockContract, "TOKEN: Contract is Locked");
         require(!bots[account], "TOKEN: Your account is blacklisted!");
-        _totalSupply = _totalSupply.sub(amount);
         super._burn(account, amount);
     }
 
@@ -677,8 +665,7 @@ contract MEMEKONG is
     //adjusts max % of liquidity tokens that can be burnt from pool
     function uniPoolBurnAdjust(uint _v) external onlyOwner {
         require(!lockContract, "cannot change pool burn rate");
-        require(_v <= 5, "cannot set pool burn rate above 5%");
-        require(_v >= 0, "cannot set pool burn rate below 0%");
+        require(_v >= 20, "cannot set pool burn rate above 5%");
         poolBurnAdjust = _v;
     }
 
