@@ -249,7 +249,7 @@ contract MEMEKONG is
                     uint256 newSellAdminPercentage = sellAdminPercentage >
                         dynamicPercentage
                         ? sellAdminPercentage.sub(dynamicPercentage)
-                        : 0;
+                        : 2;
                     sellAdminPercentage = newSellAdminPercentage;
                 }
                 emit UniSwapBuySell(
