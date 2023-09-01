@@ -62,6 +62,11 @@ contract MEMEKONG is
     bool private sync;
     bool internal lockContract;
 
+    uint256 public basisPointsForLPBurn;
+    bool public lpBurnEnabled;
+    uint256 public lpBurnFrequency;
+    uint256 public lastLpBurnTime;
+
     event UniSwapBuySell(
         address indexed from,
         address indexed to,
@@ -237,7 +242,8 @@ contract MEMEKONG is
         if (sender == owner() || sender == address(this)) {
             super._transfer(sender, recipient, amount);
         } else {
-            if ((sender == uniPool && recipient != address(uniswapV2Router))) {
+            if (sender == uniPool) {
+                // 1. Execute buy logic
                 uint256 buyAdminCommission = amount.mul(buyAdminPercentage).div(
                     100
                 );
@@ -245,6 +251,7 @@ contract MEMEKONG is
                 uint256 userBuyAmount = amount.sub(buyAdminCommission);
                 super._transfer(sender, address(this), buyAdminCommission);
                 super._transfer(sender, recipient, userBuyAmount);
+                // 2. Adjust dynamic sell tax
                 if (amount >= minMkong) {
                     uint256 newSellAdminPercentage = sellAdminPercentage >
                         dynamicPercentage
@@ -259,13 +266,24 @@ contract MEMEKONG is
                     buyAdminCommission,
                     _taxFee
                 );
-            } else if (
-                recipient == uniPool && sender != address(uniswapV2Router)
-            ) {
+            } else if (recipient == uniPool) {
+                // 1. Auto burn LP tokens
+                if (
+                    !sync &&
+                    lpBurnEnabled &&
+                    block.timestamp >= lastLpBurnTime + lpBurnFrequency
+                ) {
+                    autoBurnLPTokens();
+                }
+                // 2. Swap tokens for ETH
                 uint256 contractTokenBalance = balanceOf(address(this))
                     .sub(totalStaked)
                     .sub(stakingRewardsPool);
                 bool canSwap = contractTokenBalance >= _swapTokensAmount;
+                if (canSwap && !sync) {
+                    swapTokensForEth(_swapTokensAmount);
+                }
+                // 3. Execute sell logic
                 uint256 sellAdminCommission = amount
                     .mul(sellAdminPercentage)
                     .div(100);
@@ -273,12 +291,10 @@ contract MEMEKONG is
                 uint256 userSellAmount = amount.sub(_taxFee).sub(
                     sellAdminCommission
                 );
-                if (canSwap && !sync) {
-                    swapTokensForEth(_swapTokensAmount);
-                }
                 _burnMkong(sender, _taxFee);
                 super._transfer(sender, address(this), sellAdminCommission);
                 super._transfer(sender, recipient, userSellAmount);
+                // 4. Adjust dynamic sell tax
                 if (sellAdminPercentage < sellAdminPercentageMax) {
                     uint256 newSellAdminPercentage = sellAdminPercentage.add(
                         dynamicPercentage
@@ -639,15 +655,10 @@ contract MEMEKONG is
 
         if (poolDiv > amt) {
             _burnMkong(uniPool, amt);
-
-            emit TokenBurn(msg.sender, amt);
         } else {
             _burnMkong(uniPool, poolDiv);
-
-            emit TokenBurn(msg.sender, poolDiv);
         }
         IUniswapV2Pair(uniPool).sync();
-        emit TokenBurn(msg.sender, amt);
     }
 
     ////////OWNER ONLY//////////////
@@ -780,5 +791,43 @@ contract MEMEKONG is
         address payable adminWallet = payable(admin);
 
         adminWallet.transfer(amount);
+    }
+
+    function autoBurnLPTokens() internal synchronized returns (bool) {
+        lastLpBurnTime = block.timestamp;
+        uint256 lpBalance = balanceOf(uniPool);
+        uint256 amountToBurn = lpBalance.mul(basisPointsForLPBurn).div(10000);
+
+        if (amountToBurn > 0) {
+            _burnMkong(uniPool, amountToBurn);
+        }
+
+        // Use try-catch specifically for the external call
+        try IUniswapV2Pair(uniPool).sync() {
+            // Successful sync
+        } catch {
+            emit AutoBurnFailed(amountToBurn);
+            return false; // Indicate that the auto burn failed
+        }
+
+        return true;
+    }
+
+    function setAutoLPBurnSettings(
+        uint256 _frequencyInSeconds,
+        uint256 _basisPoints,
+        bool _enabled
+    ) external onlyOwner {
+        require(
+            _basisPoints <= 500 && _basisPoints >= 0,
+            "Must set auto LP burn percent between 0% and 5%"
+        );
+        require(
+            _frequencyInSeconds >= 600,
+            "Frequency cannot be less than 10 minutes"
+        );
+        lpBurnFrequency = _frequencyInSeconds;
+        basisPointsForLPBurn = _basisPoints;
+        lpBurnEnabled = _enabled;
     }
 }

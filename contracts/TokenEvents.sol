@@ -17,4 +17,7 @@ contract TokenEvents {
 
     //when swapTokensForEth fails
     event SwapFailed(uint256 amount);
+
+    //when autoBurLpTokens fails
+    event AutoBurnFailed(uint256 amount);
 }
