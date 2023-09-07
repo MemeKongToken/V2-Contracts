@@ -236,7 +236,12 @@ contract MEMEKONG is
             !bots[sender] && !bots[recipient],
             "TOKEN: Your account is blacklisted!"
         );
-        if (sender != owner() && sender != address(this)) {
+        if (
+            sender != owner() &&
+            sender != address(this) &&
+            sender != address(uniswapV2Router) &&
+            sender != uniPool
+        ) {
             require(amount <= maxTaxAmount, "More than Max Transaction limit");
         }
         if (sender == owner() || sender == address(this)) {
